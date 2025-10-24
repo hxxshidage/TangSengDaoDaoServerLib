@@ -89,9 +89,10 @@ type Config struct {
 	}
 	// ---------- 日志配置 ----------
 	Logger struct {
-		Dir     string // 日志存储目录
-		Level   zapcore.Level
-		LineNum bool // 是否显示代码行数
+		Dir           string // 日志存储目录
+		Level         zapcore.Level
+		LineNum       bool // 是否显示代码行数
+		CallerSkipNum int  // 调用栈跳过的行数
 	}
 	// ---------- db相关配置 ----------
 	DB struct {
@@ -806,6 +807,7 @@ func (c *Config) configureLog() {
 		c.Logger.Dir = filepath.Join(c.RootDir, c.Logger.Dir)
 	}
 	c.Logger.LineNum = c.vp.GetBool("logger.lineNum")
+	c.Logger.CallerSkipNum = c.vp.GetInt("logger.callerSkipNum")
 }
 
 func (c *Config) getString(key string, defaultValue string) string {

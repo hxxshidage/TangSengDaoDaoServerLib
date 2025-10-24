@@ -18,3 +18,9 @@ func Md5Hmac(key, seg string) string {
 	mac.Write([]byte(seg))
 	return hex.EncodeToString(mac.Sum(nil))
 }
+
+func Md5(plain string) string {
+	h := md5.New()
+	h.Write([]byte(plain))
+	return hex.EncodeToString(h.Sum(nil))
+}

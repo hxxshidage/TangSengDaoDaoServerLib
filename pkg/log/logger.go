@@ -42,7 +42,7 @@ func Configure(opts *Options) {
 		atom,
 	)
 	if opts.LineNum {
-		logger = zap.New(core, zap.AddCaller())
+		logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(opts.CallerSkipNum))
 	} else {
 		logger = zap.New(core)
 	}
@@ -59,7 +59,7 @@ func Configure(opts *Options) {
 		zap.ErrorLevel,
 	)
 	if opts.LineNum {
-		errorLogger = zap.New(core, zap.AddCaller())
+		errorLogger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(opts.CallerSkipNum))
 	} else {
 		errorLogger = zap.New(core)
 	}
@@ -76,7 +76,7 @@ func Configure(opts *Options) {
 		zap.WarnLevel,
 	)
 	if opts.LineNum {
-		warnLogger = zap.New(core, zap.AddCaller())
+		warnLogger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(opts.CallerSkipNum))
 	} else {
 		warnLogger = zap.New(core)
 	}
@@ -89,7 +89,7 @@ func newEncoderConfig() zapcore.EncoderConfig {
 		TimeKey:       "time",
 		LevelKey:      "level",
 		NameKey:       "logger",
-		CallerKey:     "linenum",
+		CallerKey:     "caller",
 		MessageKey:    "msg",
 		StacktraceKey: "stacktrace",
 		LineEnding:    zapcore.DefaultLineEnding,
@@ -97,7 +97,7 @@ func newEncoderConfig() zapcore.EncoderConfig {
 		EncodeCaller:  zapcore.FullCallerEncoder,     // 全路径编码器
 		EncodeName:    zapcore.FullNameEncoder,
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-			enc.AppendString(t.Format("2006-01-02 15:04:05"))
+			enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
 		},
 		EncodeDuration: func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendInt64(int64(d) / 1000000)
