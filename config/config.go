@@ -103,6 +103,8 @@ type Config struct {
 		OutputLog            bool          // 输入调试日志
 		RedisAddr            string        // redis地址
 		RedisPass            string        // redis密码
+		RedisMaxIdle         int           // 最大限制连接
+		RedisMaxOpen         int           // 最大连接数
 		AsynctaskRedisAddr   string        // 异步任务的redis地址 不写默认为RedisAddr的地址
 	}
 	// ---------- 分布式配置 ----------
@@ -325,6 +327,8 @@ func New() *Config {
 			OutputLog            bool
 			RedisAddr            string
 			RedisPass            string
+			RedisMaxIdle         int
+			RedisMaxOpen         int
 			AsynctaskRedisAddr   string
 		}{
 			MySQLAddr:            "root:demo@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true",
@@ -577,9 +581,12 @@ func (c *Config) ConfigureWithViper(vp *viper.Viper) {
 	c.DB.MySQLMaxOpenConns = c.getInt("db.mysqlMaxOpenConns", c.DB.MySQLMaxOpenConns)
 	c.DB.MySQLMaxIdleConns = c.getInt("db.mysqlMaxIdleConns", c.DB.MySQLMaxIdleConns)
 	c.DB.MySQLConnMaxLifetime = c.getDuration("db.mysqlConnMaxLifetime", c.DB.MySQLConnMaxLifetime)
-	c.DB.Migration = c.getBool("db.migration", c.DB.Migration)
+	c.DB.Migration = c.getBool("db.migration", false)
+	c.DB.OutputLog = c.getBool("db.outputLog", false)
 	c.DB.RedisAddr = c.getString("db.redisAddr", c.DB.RedisAddr)
 	c.DB.RedisPass = c.getString("db.redisPass", c.DB.RedisPass)
+	c.DB.RedisMaxIdle = c.getInt("db.redisMaxIdle", 2)
+	c.DB.RedisMaxOpen = c.getInt("db.redisMaxOpen", 4)
 	c.DB.AsynctaskRedisAddr = c.getString("db.asynctaskRedisAddr", c.DB.AsynctaskRedisAddr)
 
 	//#################### cluster ####################

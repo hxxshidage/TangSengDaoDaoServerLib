@@ -2,10 +2,24 @@ package redis
 
 import (
 	"errors"
+	"fmt"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
+	"sync/atomic"
 	"time"
 
 	rd "github.com/go-redis/redis"
 )
+
+type RdConfig struct {
+	Addresses            string
+	Password             string
+	MinIdle              int
+	PoolSize             int
+	ConnMaxIdleTimeMills int64
+	ReadTimeoutMills     int64
+	WriteTimeoutMills    int64
+	MaxWaitTimeoutMills  int64
+}
 
 type Field struct {
 	Field string `json:"field"`
@@ -13,7 +27,15 @@ type Field struct {
 }
 
 type Conn struct {
-	client *rd.Client
+	client rd.UniversalClient
+}
+
+var (
+	rdCliAtm atomic.Value
+)
+
+func GetRedisCli() rd.UniversalClient {
+	return rdCliAtm.Load().(rd.UniversalClient)
 }
 
 func New(addr string, password string) *Conn {
@@ -23,6 +45,53 @@ func New(addr string, password string) *Conn {
 		MaxRetries: 3, // 失败重试次数
 		Password:   password,
 	})
+	rdCliAtm.Store(c.client)
+	return c
+}
+
+func NewWithCfg(cfg RdConfig) *Conn {
+	hpMap := util.ExtractHostPort(cfg.Addresses)
+	cluster := len(hpMap) > 1
+
+	var (
+		client  rd.UniversalClient
+		addrArr = make([]string, 0, len(hpMap))
+	)
+
+	for h, p := range hpMap {
+		addrArr = append(addrArr, fmt.Sprintf("%s:%d", h, p))
+	}
+
+	c := &Conn{}
+
+	if cluster {
+		client = rd.NewClusterClient(&rd.ClusterOptions{
+			Addrs:        addrArr,
+			Password:     cfg.Password,
+			MinIdleConns: cfg.MinIdle,
+			ReadTimeout:  time.Duration(cfg.ReadTimeoutMills) * time.Second,
+			WriteTimeout: time.Duration(cfg.WriteTimeoutMills) * time.Second,
+			PoolTimeout:  time.Duration(cfg.MaxWaitTimeoutMills) * time.Second,
+			IdleTimeout:  time.Duration(cfg.ConnMaxIdleTimeMills) * time.Minute,
+			PoolSize:     cfg.PoolSize,
+		})
+	} else {
+		client = rd.NewClient(&rd.Options{
+			Addr:         cfg.Addresses,
+			DB:           0,
+			Password:     cfg.Password,
+			MinIdleConns: cfg.MinIdle,
+			ReadTimeout:  time.Duration(cfg.ReadTimeoutMills) * time.Second,
+			WriteTimeout: time.Duration(cfg.WriteTimeoutMills) * time.Second,
+			PoolTimeout:  time.Duration(cfg.MaxWaitTimeoutMills) * time.Second,
+			IdleTimeout:  time.Duration(cfg.ConnMaxIdleTimeMills) * time.Minute,
+			PoolSize:     cfg.PoolSize,
+		})
+	}
+
+	c.client = client
+
+	rdCliAtm.Store(c.client)
 	return c
 }
 

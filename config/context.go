@@ -114,6 +114,13 @@ func (c *Context) NewRedisCache() *common.RedisCache {
 	return c.redisCache
 }
 
+func (c *Context) NewRedisCacheWithCfg(cfg redis.RdConfig) *common.RedisCache {
+	if c.redisCache == nil {
+		c.redisCache = common.NewRedisCacheWithCfg(cfg)
+	}
+	return c.redisCache
+}
+
 // NewMemoryCache 创建一个内存缓存
 func (c *Context) NewMemoryCache() cache.Cache {
 	if c.memoryCache == nil {
@@ -124,7 +131,23 @@ func (c *Context) NewMemoryCache() cache.Cache {
 
 // Cache 缓存
 func (c *Context) Cache() cache.Cache {
-	return c.NewRedisCache()
+	//return c.NewRedisCache()
+
+	var dbCfg2rdCfgFunc = func() redis.RdConfig {
+		dbCfg := c.cfg.DB
+		return redis.RdConfig{
+			Addresses:            dbCfg.RedisAddr,
+			Password:             dbCfg.RedisPass,
+			MinIdle:              dbCfg.RedisMaxIdle,
+			PoolSize:             dbCfg.RedisMaxOpen,
+			ConnMaxIdleTimeMills: 60 * 1000,
+			ReadTimeoutMills:     3 * 1000,
+			WriteTimeoutMills:    3 * 1000,
+			MaxWaitTimeoutMills:  5 * 1000,
+		}
+	}
+
+	return c.NewRedisCacheWithCfg(dbCfg2rdCfgFunc())
 }
 
 // 认证中间件

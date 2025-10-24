@@ -19,6 +19,12 @@ func NewRedisCache(addr string, password string) *RedisCache {
 	return r
 }
 
+func NewRedisCacheWithCfg(cfg redis.RdConfig) *RedisCache {
+	r := &RedisCache{}
+	r.conn = redis.NewWithCfg(cfg)
+	return r
+}
+
 // Set Set
 func (r *RedisCache) Set(key string, value string) error {
 	return r.conn.Set(key, value)
