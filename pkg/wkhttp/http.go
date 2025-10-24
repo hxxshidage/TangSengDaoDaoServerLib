@@ -109,6 +109,17 @@ func (c *Context) Response(data interface{}) {
 	c.JSON(http.StatusOK, data)
 }
 
+func (c *Context) RespWithData(data any) {
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": http.StatusOK,
+			"msg":    "",
+			"data":   data,
+		},
+	)
+}
+
 // ResponseWithStatus ResponseWithStatus
 func (c *Context) ResponseWithStatus(status int, data interface{}) {
 	c.JSON(status, data)

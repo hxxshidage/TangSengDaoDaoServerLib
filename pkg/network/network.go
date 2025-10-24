@@ -3,28 +3,50 @@ package network
 import (
 	"errors"
 	"fmt"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
+	"github.com/sendgrid/rest"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
-	"github.com/sendgrid/rest"
+	"sync/atomic"
 )
 
-func Post(url string, body []byte, headers map[string]string) (resp *rest.Response, err error) {
+var (
+	internalKey string
+	hadSet      atomic.Bool
+)
 
-	return RequestBoy(url, body, headers, rest.Post)
+func SettingInternalKey(key string) {
+	if hadSet.CompareAndSwap(false, true) {
+		internalKey = key
+	}
+}
+
+func Post(url string, body []byte, headers map[string]string) (resp *rest.Response, err error) {
+	return RequestBoy(url, body, appendKey2header(headers), rest.Post)
+}
+
+func appendKey2header(headers map[string]string) map[string]string {
+	if internalKey == "" {
+		return headers
+	}
+
+	if headers == nil {
+		headers = make(map[string]string, 1)
+	}
+
+	headers["k-from-internal"] = internalKey
+
+	return headers
 }
 
 func Put(url string, body []byte, headers map[string]string) (resp *rest.Response, err error) {
-
 	return RequestBoy(url, body, headers, rest.Put)
 }
 
 func PostForQueryParam(url string, queryParams map[string]string, headers map[string]string) (resp *rest.Response, err error) {
-
 	return RequestBoyForQueryParam(url, queryParams, headers, rest.Post)
 }
 
@@ -55,6 +77,7 @@ func RequestBoy(url string, body []byte, headers map[string]string, method rest.
 	if err != nil {
 		return nil, err
 	}
+
 	return response, nil
 }
 
@@ -63,7 +86,7 @@ func Get(url string, queryParams map[string]string, headers map[string]string) (
 	request := rest.Request{
 		Method:      rest.Get,
 		BaseURL:     url,
-		Headers:     headers,
+		Headers:     appendKey2header(headers),
 		QueryParams: queryParams,
 	}
 	response, err := rest.API(request)

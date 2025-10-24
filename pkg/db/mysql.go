@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -12,10 +13,42 @@ import (
 	migrate "github.com/rubenv/sql-migrate"
 )
 
-// NewMySQL 创建一个MySQL db，[path]db存储路径 [sqlDir]sql脚本目录
-func NewMySQL(addr string, maxOpenConns int, maxIdleConns int, connMaxLifetime time.Duration) *dbr.Session {
+type sqlLogger struct{}
 
-	conn, err := dbr.Open("mysql", addr, nil)
+func (s *sqlLogger) Event(eventName string) {
+	log.Printf("[Event]:%s", eventName)
+}
+
+func (s *sqlLogger) EventKv(eventName string, kvs map[string]string) {
+	log.Printf("[EventKv]:%s, kvs:%v", eventName, kvs)
+}
+
+func (s *sqlLogger) EventErr(eventName string, err error) error {
+	log.Printf("[EventErr]:%s, error:%v", eventName, err)
+	return err
+}
+
+func (s *sqlLogger) EventErrKv(eventName string, err error, kvs map[string]string) error {
+	log.Printf("[EventErrKv]:%s, error:%v, kvs: %v", eventName, err, kvs)
+	return err
+}
+
+func (s *sqlLogger) Timing(eventName string, nanoseconds int64) {
+	log.Printf("[Timing]:%s, duration:%d ns", eventName, nanoseconds)
+}
+
+func (s *sqlLogger) TimingKv(eventName string, nanoseconds int64, kvs map[string]string) {
+	log.Printf("[TimingKv]:%s, kvs:%v, duration: %d ns,", eventName, kvs, nanoseconds)
+}
+
+// NewMySQL 创建一个MySQL db，[path]db存储路径 [sqlDir]sql脚本目录
+func NewMySQL(addr string, maxOpenConns int, maxIdleConns int, connMaxLifetime time.Duration, outputLog bool) *dbr.Session {
+	var sqlLog dbr.EventReceiver
+	if outputLog {
+		sqlLog = &sqlLogger{}
+	}
+
+	conn, err := dbr.Open("mysql", addr, sqlLog)
 	if err != nil {
 		panic(err)
 	}

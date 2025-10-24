@@ -100,6 +100,7 @@ type Config struct {
 		MySQLMaxIdleConns    int           // 最大空闲连接数
 		MySQLConnMaxLifetime time.Duration // 连接最大生命周期
 		Migration            bool          // 是否合并数据库
+		OutputLog            bool          // 输入调试日志
 		RedisAddr            string        // redis地址
 		RedisPass            string        // redis密码
 		AsynctaskRedisAddr   string        // 异步任务的redis地址 不写默认为RedisAddr的地址
@@ -120,6 +121,13 @@ type Config struct {
 		TokenExpire                 time.Duration // token失效时间
 		NameCacheExpire             time.Duration // 名字缓存过期时间
 	}
+
+	// ---------- 服务端调用配置 ----------
+	S2s struct {
+		FromSecKey string
+		ToWkKey    string
+	}
+
 	// ---------- 系统账户设置 ----------
 	Account struct {
 		SystemUID       string //系统账号uid
@@ -314,6 +322,7 @@ func New() *Config {
 			MySQLMaxIdleConns    int
 			MySQLConnMaxLifetime time.Duration
 			Migration            bool
+			OutputLog            bool
 			RedisAddr            string
 			RedisPass            string
 			AsynctaskRedisAddr   string
@@ -323,6 +332,7 @@ func New() *Config {
 			MySQLMaxIdleConns:    10,
 			MySQLConnMaxLifetime: time.Second * 60 * 60 * 4, //mysql 默认超时时间为 60*60*8=28800 SetConnMaxLifetime设置为小于数据库超时时间即可
 			Migration:            true,
+			OutputLog:            true,
 			RedisAddr:            "127.0.0.1:6379",
 		},
 		// ---------- 分布式配置 ----------
@@ -584,6 +594,10 @@ func (c *Config) ConfigureWithViper(vp *viper.Viper) {
 	c.Cache.FriendApplyExpire = c.getDuration("cache.friendApplyExpire", c.Cache.FriendApplyExpire)
 	c.Cache.TokenExpire = c.getDuration("cache.tokenExpire", c.Cache.TokenExpire)
 	c.Cache.NameCacheExpire = c.getDuration("cache.nameCacheExpire", c.Cache.NameCacheExpire)
+
+	//#################### 服务调用配置 ####################
+	c.S2s.FromSecKey = c.getString("apiCallCfg.fromSecKey", "")
+	c.S2s.ToWkKey = c.getString("apiCallCfg.toWkKey", "")
 
 	//#################### 内置账户配置 ####################
 	c.Account.SystemUID = c.getString("account.systemUID", c.Account.SystemUID)

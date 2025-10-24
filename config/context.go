@@ -2,6 +2,7 @@ package config
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/RussellLuo/timingwheel"
@@ -42,6 +43,10 @@ type Context struct {
 	SetupTask bool // 是否安装task
 }
 
+var (
+	myCtxPtr atomic.Pointer[Context]
+)
+
 // NewContext NewContext
 func NewContext(cfg *Config) *Context {
 	userIDGen, err := snowflake.NewNode(int64(cfg.Cluster.NodeID))
@@ -65,6 +70,9 @@ func NewContext(cfg *Config) *Context {
 	}
 	opentracing.SetGlobalTracer(c.tracer)
 	c.timingWheel.Start()
+
+	myCtxPtr.Store(c)
+
 	return c
 }
 
@@ -77,7 +85,7 @@ func (c *Context) GetConfig() *Config {
 func (c *Context) NewMySQL() *dbr.Session {
 
 	if c.mySQLSession == nil {
-		c.mySQLSession = db.NewMySQL(c.cfg.DB.MySQLAddr, c.cfg.DB.MySQLMaxOpenConns, c.cfg.DB.MySQLMaxIdleConns, c.cfg.DB.MySQLConnMaxLifetime)
+		c.mySQLSession = db.NewMySQL(c.cfg.DB.MySQLAddr, c.cfg.DB.MySQLMaxOpenConns, c.cfg.DB.MySQLMaxIdleConns, c.cfg.DB.MySQLConnMaxLifetime, c.cfg.DB.OutputLog)
 	}
 
 	return c.mySQLSession
@@ -235,4 +243,10 @@ type everyScheduler struct {
 
 func (s *everyScheduler) Next(prev time.Time) time.Time {
 	return prev.Add(s.Interval)
+}
+
+type DoAction[T any] func(sess *dbr.Session) (T, error)
+
+func DoWithDb[T any](da DoAction[T]) (T, error) {
+	return da(myCtxPtr.Load().mySQLSession)
 }
