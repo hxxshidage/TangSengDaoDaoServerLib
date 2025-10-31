@@ -109,13 +109,72 @@ func (c *Context) Response(data interface{}) {
 	c.JSON(http.StatusOK, data)
 }
 
-func (c *Context) RespWithData(data any) {
+func (c *Context) ExRespOk(data any) {
 	c.JSON(
 		http.StatusOK,
 		gin.H{
 			"status": http.StatusOK,
 			"msg":    "",
 			"data":   data,
+		},
+	)
+}
+
+func (c *Context) ExRespJustOk() {
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": http.StatusOK,
+		},
+	)
+}
+
+func (c *Context) ExRespGenErrMsg(msg string) {
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": 0,
+			"msg":    msg,
+		},
+	)
+}
+
+func (c *Context) ExRespBadErr(err error) {
+	c.JSON(
+		http.StatusBadRequest,
+		gin.H{
+			"status": http.StatusBadRequest,
+			"msg":    err.Error(),
+		},
+	)
+}
+
+func (c *Context) ExRespGenErr(err error) {
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": 0,
+			"msg":    err.Error(),
+		},
+	)
+}
+
+func (c *Context) ExRespErrMsg(code int, msg string) {
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": code,
+			"msg":    msg,
+		},
+	)
+}
+
+func (c *Context) ExRespErr(code int, err error) {
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": code,
+			"msg":    err.Error(),
 		},
 	)
 }

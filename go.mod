@@ -12,11 +12,13 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gocraft/dbr/v2 v2.7.5
 	github.com/gomarkdown/markdown v0.0.0-20230716120725-531d2d74bc12
+	github.com/gotidy/copy v0.6.0
 	github.com/judwhite/go-svc v1.2.1
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/panjf2000/ants/v2 v2.10.0
+	github.com/pkg/errors v0.9.1
 	github.com/rubenv/sql-migrate v1.5.2
 	github.com/sendgrid/rest v2.6.9+incompatible
 	github.com/sourcegraph/syntaxhighlight v0.0.0-20170531221838-bd320f5d308e
@@ -88,7 +90,6 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sourcegraph/annotate v0.0.0-20160123013949-f4cad6c6324d // indirect

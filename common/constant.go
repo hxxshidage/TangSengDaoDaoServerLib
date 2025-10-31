@@ -169,6 +169,9 @@ const (
 	CMDSyncPinnedMessage = "syncPinnedMessage"
 	// 消息擦除
 	CMDMessageErase = "messageEerase"
+
+	// #################### 命令扩展 ####################
+	CMDMessageOrderEventNotify = "messageOrderEventNotify" // 订单事件通知
 )
 
 // UserDeviceTokenPrefix 用户设备token缓存前缀

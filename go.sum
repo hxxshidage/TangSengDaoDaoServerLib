@@ -263,6 +263,10 @@ github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5m
 github.com/googleapis/gax-go/v2 v2.8.0 h1:UBtEZqx1bjXtOQ5BVTkuYghXrr3N4V123VKJK67vJZc=
 github.com/googleapis/gax-go/v2 v2.8.0/go.mod h1:4orTrqY6hXxxaUL4LHIPl6lGo8vAE38/qKbhSAKP6QI=
 github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8/go.mod h1:dvDLG8qkwmyD9a/MJJN3XJcT3xFxOKAvTZGvuZmac9g=
+github.com/gotidy/copy v0.6.0 h1:BQ8bRSuhGusdenh5KWe+9z9GTnguUEqmLDWx5SNBmVo=
+github.com/gotidy/copy v0.6.0/go.mod h1:5+A072M589lvnzFi8TKS+R2Hf0g2cKGrr+2DsfHrF7Y=
+github.com/gotidy/ptr v1.3.0 h1:5wdrH1G8X4txy6fbWWRznr7k974wMWtePWP3p6s1API=
+github.com/gotidy/ptr v1.3.0/go.mod h1:vpltyHhOZE+NGXUiwpVl3wV9AGEBlxhdnaimPDxRLxg=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=

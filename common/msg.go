@@ -43,6 +43,9 @@ const (
 	// InviteJoinOrganization 邀请加入组织
 	InviteJoinOrganization ContentType = 16
 
+	// 自定义消息类
+	CustomMsg ContentType = 90
+
 	// 消息正文错误
 	ContentError ContentType = 97
 	// signal 解密失败
@@ -162,7 +165,7 @@ func GetFakeChannelIDWith(fromUID, toUID string) string {
 		return fmt.Sprintf("%s@%s", fromUID, toUID)
 	}
 	if fromUIDHash == toUIDHash {
-		imlog.Warn("生成的fromUID的Hash和toUID的Hash是相同的！！", zap.Uint32("fromUIDHash", fromUIDHash), zap.Uint32("toUIDHash", toUIDHash), zap.String("fromUID", fromUID), zap.String("toUID", toUID))
+		imlog.Debug("生成的fromUID的Hash和toUID的Hash是相同的！！", zap.Uint32("fromUIDHash", fromUIDHash), zap.Uint32("toUIDHash", toUIDHash), zap.String("fromUID", fromUID), zap.String("toUID", toUID))
 	}
 
 	return fmt.Sprintf("%s@%s", toUID, fromUID)

@@ -1,6 +1,9 @@
 package config
 
 import (
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
+	"github.com/pkg/errors"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,10 +25,11 @@ import (
 
 // Context 配置上下文
 type Context struct {
-	cfg          *Config
-	mySQLSession *dbr.Session
-	redisCache   *common.RedisCache
-	memoryCache  cache.Cache
+	cfg            *Config
+	mySQLSession   *dbr.Session
+	redisCacheOnce sync.Once
+	redisCache     *common.RedisCache
+	memoryCache    cache.Cache
 	log.Log
 	EventPool      pool.Collector
 	PushPool       pool.Collector // 离线push
@@ -60,9 +64,9 @@ func NewContext(cfg *Config) *Context {
 		EventPool:      pool.StartDispatcher(cfg.EventPoolSize),
 		PushPool:       pool.StartDispatcher(cfg.Push.PushPoolSize),
 		RobotEventPool: pool.StartDispatcher(cfg.Robot.EventPoolSize),
-		aysncTask:      NewAsyncTask(cfg),
-		timingWheel:    timingwheel.NewTimingWheel(cfg.TimingWheelTick.Duration, cfg.TimingWheelSize),
-		valueMap:       sync.Map{},
+		//aysncTask:      NewAsyncTask(cfg),
+		timingWheel: timingwheel.NewTimingWheel(cfg.TimingWheelTick.Duration, cfg.TimingWheelSize),
+		valueMap:    sync.Map{},
 	}
 	c.tracer, err = NewTracer(cfg)
 	if err != nil {
@@ -132,22 +136,54 @@ func (c *Context) NewMemoryCache() cache.Cache {
 // Cache 缓存
 func (c *Context) Cache() cache.Cache {
 	//return c.NewRedisCache()
-
-	var dbCfg2rdCfgFunc = func() redis.RdConfig {
-		dbCfg := c.cfg.DB
-		return redis.RdConfig{
-			Addresses:            dbCfg.RedisAddr,
-			Password:             dbCfg.RedisPass,
-			MinIdle:              dbCfg.RedisMaxIdle,
-			PoolSize:             dbCfg.RedisMaxOpen,
-			ConnMaxIdleTimeMills: 60 * 1000,
-			ReadTimeoutMills:     3 * 1000,
-			WriteTimeoutMills:    3 * 1000,
-			MaxWaitTimeoutMills:  5 * 1000,
+	c.redisCacheOnce.Do(func() {
+		var dbCfg2rdCfgFunc = func() redis.RdConfig {
+			dbCfg := c.cfg.DB
+			return redis.RdConfig{
+				Addresses:            dbCfg.RedisAddr,
+				Password:             dbCfg.RedisPass,
+				MinIdle:              dbCfg.RedisMaxIdle,
+				PoolSize:             dbCfg.RedisMaxOpen,
+				ConnMaxIdleTimeMills: 60 * 1000,
+				ReadTimeoutMills:     3 * 1000,
+				WriteTimeoutMills:    3 * 1000,
+				MaxWaitTimeoutMills:  5 * 1000,
+			}
 		}
-	}
 
-	return c.NewRedisCacheWithCfg(dbCfg2rdCfgFunc())
+		c.NewRedisCacheWithCfg(dbCfg2rdCfgFunc())
+	})
+
+	return c.redisCache
+}
+
+type AbortUse func() bool
+
+func (c *Context) AbortUseMiddleware(au AbortUse) wkhttp.HandlerFunc {
+	return func(c *wkhttp.Context) {
+		if au() {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func (c *Context) BizExMiddleware(secKey string) wkhttp.HandlerFunc {
+	return func(c *wkhttp.Context) {
+		hsign := c.Query("hsign")
+		ts := c.Query("ts")
+
+		if hsign != util.Md5Hmac(secKey, ts) {
+			err := errors.New("access forbidden, hsign not eq")
+			c.ResponseError(err)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 // 认证中间件
@@ -272,4 +308,63 @@ type DoAction[T any] func(sess *dbr.Session) (T, error)
 
 func DoWithDb[T any](da DoAction[T]) (T, error) {
 	return da(myCtxPtr.Load().mySQLSession)
+}
+
+type PageParam struct {
+	Page int
+	Size int
+}
+
+func NewPp(page, size int) PageParam {
+	return PageParam{Page: page, Size: size}
+}
+
+type Pager[T any] struct {
+	Total int64 `json:"total,omitempty"`
+	Page  int   `json:"page,omitempty"`
+	Size  int   `json:"size,omitempty"`
+	Items []*T  `json:"items,omitempty"`
+}
+
+type Converter[T, R any] func(*T) *R
+
+func ConvertItems[T, R any](p *Pager[T], converter Converter[T, R]) *Pager[R] {
+	np := &Pager[R]{
+		Total: p.Total,
+		Page:  p.Page,
+		Size:  p.Size,
+	}
+
+	newItems := make([]*R, len(np.Items))
+	for idx, t := range p.Items {
+		newItems[idx] = converter(t)
+	}
+
+	return np
+}
+
+type StmtBuilder func(sess *dbr.Session) (*dbr.SelectStmt, *dbr.SelectStmt)
+
+func PageQry[T any](pp PageParam, stmt StmtBuilder) (*Pager[T], error) {
+	sess := myCtxPtr.Load().mySQLSession
+	count, result := stmt(sess)
+
+	p := &Pager[T]{}
+
+	err := count.LoadOne(&p.Total)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = result.
+		Offset(uint64((pp.Page - 1) * pp.Size)).
+		Limit(uint64(pp.Size)).
+		Load(&p.Items)
+	if err != nil {
+		return nil, err
+	}
+
+	p.Page = pp.Page
+	p.Size = pp.Size
+	return p, nil
 }
