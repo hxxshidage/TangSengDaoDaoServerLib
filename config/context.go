@@ -335,10 +335,12 @@ func ConvertItems[T, R any](p *Pager[T], converter Converter[T, R]) *Pager[R] {
 		Size:  p.Size,
 	}
 
-	newItems := make([]*R, len(np.Items))
+	newItems := make([]*R, len(p.Items))
 	for idx, t := range p.Items {
 		newItems[idx] = converter(t)
 	}
+
+	np.Items = newItems
 
 	return np
 }
