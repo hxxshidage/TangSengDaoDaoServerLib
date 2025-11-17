@@ -2,7 +2,6 @@ package redis
 
 import (
 	"errors"
-	"fmt"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
 	"sync/atomic"
 	"time"
@@ -50,17 +49,17 @@ func New(addr string, password string) *Conn {
 }
 
 func NewWithCfg(cfg RdConfig) *Conn {
-	hpMap := util.ExtractHostPort(cfg.Addresses)
-	cluster := len(hpMap) > 1
+	addrArr := util.ExtractAddress(cfg.Addresses)
+
+	if len(addrArr) == 0 {
+		addrArr = append(addrArr, "127.0.0.1:6379")
+	}
+
+	cluster := len(addrArr) > 1
 
 	var (
-		client  rd.UniversalClient
-		addrArr = make([]string, 0, len(hpMap))
+		client rd.UniversalClient
 	)
-
-	for h, p := range hpMap {
-		addrArr = append(addrArr, fmt.Sprintf("%s:%d", h, p))
-	}
 
 	c := &Conn{}
 
@@ -77,7 +76,7 @@ func NewWithCfg(cfg RdConfig) *Conn {
 		})
 	} else {
 		client = rd.NewClient(&rd.Options{
-			Addr:         cfg.Addresses,
+			Addr:         addrArr[0],
 			DB:           0,
 			Password:     cfg.Password,
 			MinIdleConns: cfg.MinIdle,

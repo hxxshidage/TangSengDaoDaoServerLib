@@ -20,3 +20,21 @@ func ExtractHostPort(addresses string) map[string]int {
 
 	return rMap
 }
+
+func ExtractAddress(addresses string) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, addr := range strings.Split(addresses, ",") {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			continue
+		}
+		if !seen[addr] {
+			seen[addr] = true
+			result = append(result, addr)
+		}
+	}
+
+	return result
+}

@@ -65,6 +65,7 @@ type Config struct {
 
 	// ---------- 基础配置 ----------
 	Mode                        Mode   // 模式 debug 测试 release 正式 bench 压力测试
+	Profile                     string // 运行环境
 	AppID                       string // APP ID
 	AppName                     string // APP名称
 	Version                     string // 版本
@@ -238,6 +239,7 @@ type Config struct {
 	}
 	// ---------- push ----------
 	Push struct {
+		Enabled         bool         // 是否开启推送
 		ContentDetailOn bool         //  推送是否显示正文详情(如果为false，则只显示“您有一条新的消息” 默认为true)
 		PushPoolSize    int64        // 推送任务池大小
 		APNS            APNSPush     // 苹果推送
@@ -294,6 +296,7 @@ func New() *Config {
 	cfg := &Config{
 		// ---------- 基础配置 ----------
 		Mode:                        ReleaseMode,
+		Profile:                     "prod",
 		AppID:                       "tangsengdaodao",
 		AppName:                     "唐僧叨叨",
 		Addr:                        ":8090",
@@ -485,6 +488,7 @@ func New() *Config {
 		},
 		// ---------- push  ----------
 		Push: struct {
+			Enabled         bool
 			ContentDetailOn bool
 			PushPoolSize    int64
 			APNS            APNSPush
@@ -494,6 +498,7 @@ func New() *Config {
 			OPPO            OPPOPush
 			FIREBASE        FIREBASEPush
 		}{
+			Enabled:         false,
 			ContentDetailOn: true,
 			PushPoolSize:    100,
 			APNS: APNSPush{
@@ -536,6 +541,7 @@ func (c *Config) ConfigureWithViper(vp *viper.Viper) {
 	intranetIP := getIntranetIP() // 内网IP
 	// #################### 基础配置 ####################
 	c.Mode = Mode(c.getString("mode", string(DebugMode)))
+	c.Profile = c.getString("profile", c.Profile)
 	c.AppID = c.getString("appID", c.AppID)
 	c.AppName = c.getString("appName", c.AppName)
 	c.RootDir = c.getString("rootDir", c.RootDir)
@@ -733,6 +739,7 @@ func (c *Config) ConfigureWithViper(vp *viper.Viper) {
 	c.Group.SameDayCreateMaxCount = c.getInt("group.sameDayCreateMaxCount", c.Group.SameDayCreateMaxCount)
 	c.Group.CreateGroupVerifyFriendOn = c.getBool("group.createGroupVerifyFriendOn", c.Group.CreateGroupVerifyFriendOn)
 	//#################### push ####################
+	c.Push.Enabled = c.getBool("push.enabled", c.Push.Enabled)
 	c.Push.ContentDetailOn = c.getBool("push.contentDetailOn", c.Push.ContentDetailOn)
 	c.Push.PushPoolSize = c.getInt64("push.pushPoolSize", c.Push.PushPoolSize)
 	// apns

@@ -319,6 +319,17 @@ func (l *WKHttp) handlersToGinHandleFuncs(handlers []HandlerFunc) []gin.HandlerF
 	return newHandlers
 }
 
+var (
+	mwLogOnce sync.Once
+	mwLog     log.Log
+)
+
+func initMwLog() {
+	mwLogOnce.Do(func() {
+		mwLog = log.NewTLog("middleware")
+	})
+}
+
 // AuthMiddleware 认证中间件
 func (l *WKHttp) AuthMiddleware(cache cache.Cache, tokenPrefix string) HandlerFunc {
 

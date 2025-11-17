@@ -21,6 +21,7 @@ import (
 	"github.com/gocraft/dbr/v2"
 	"github.com/olivere/elastic"
 	"github.com/opentracing/opentracing-go"
+	"strings"
 )
 
 // Context 配置上下文
@@ -58,16 +59,21 @@ func NewContext(cfg *Config) *Context {
 		panic(err)
 	}
 	c := &Context{
-		cfg:            cfg,
-		UserIDGen:      userIDGen,
-		Log:            log.NewTLog("Context"),
-		EventPool:      pool.StartDispatcher(cfg.EventPoolSize),
-		PushPool:       pool.StartDispatcher(cfg.Push.PushPoolSize),
+		cfg:       cfg,
+		UserIDGen: userIDGen,
+		Log:       log.NewTLog("Context"),
+		EventPool: pool.StartDispatcher(cfg.EventPoolSize),
+		//PushPool:       pool.StartDispatcher(cfg.Push.PushPoolSize),
 		RobotEventPool: pool.StartDispatcher(cfg.Robot.EventPoolSize),
 		//aysncTask:      NewAsyncTask(cfg),
 		timingWheel: timingwheel.NewTimingWheel(cfg.TimingWheelTick.Duration, cfg.TimingWheelSize),
 		valueMap:    sync.Map{},
 	}
+
+	if cfg.Push.Enabled {
+		c.PushPool = pool.StartDispatcher(cfg.Push.PushPoolSize)
+	}
+
 	c.tracer, err = NewTracer(cfg)
 	if err != nil {
 		panic(err)
@@ -119,9 +125,10 @@ func (c *Context) NewRedisCache() *common.RedisCache {
 }
 
 func (c *Context) NewRedisCacheWithCfg(cfg redis.RdConfig) *common.RedisCache {
-	if c.redisCache == nil {
+	c.redisCacheOnce.Do(func() {
 		c.redisCache = common.NewRedisCacheWithCfg(cfg)
-	}
+	})
+
 	return c.redisCache
 }
 
@@ -136,25 +143,8 @@ func (c *Context) NewMemoryCache() cache.Cache {
 // Cache 缓存
 func (c *Context) Cache() cache.Cache {
 	//return c.NewRedisCache()
-	c.redisCacheOnce.Do(func() {
-		var dbCfg2rdCfgFunc = func() redis.RdConfig {
-			dbCfg := c.cfg.DB
-			return redis.RdConfig{
-				Addresses:            dbCfg.RedisAddr,
-				Password:             dbCfg.RedisPass,
-				MinIdle:              dbCfg.RedisMaxIdle,
-				PoolSize:             dbCfg.RedisMaxOpen,
-				ConnMaxIdleTimeMills: 60 * 1000,
-				ReadTimeoutMills:     3 * 1000,
-				WriteTimeoutMills:    3 * 1000,
-				MaxWaitTimeoutMills:  5 * 1000,
-			}
-		}
 
-		c.NewRedisCacheWithCfg(dbCfg2rdCfgFunc())
-	})
-
-	return c.redisCache
+	return c.NewRedisCacheWithCfg(cfg2redisCfg(c))
 }
 
 type AbortUse func() bool
@@ -192,9 +182,68 @@ func (c *Context) AuthMiddleware(r *wkhttp.WKHttp) wkhttp.HandlerFunc {
 	return r.AuthMiddleware(c.Cache(), c.cfg.Cache.TokenCachePrefix)
 }
 
+type ExcludeAccessPath struct {
+	ExcludePath string
+	FullPath    bool
+}
+
+// API禁止访问中间件
+func (c *Context) ApiAccessReject(groupPath string, excludePaths []ExcludeAccessPath) wkhttp.HandlerFunc {
+	canAccessWithCfg := c.cfg.Profile == "local" && c.cfg.Mode == DebugMode
+
+	return func(c *wkhttp.Context) {
+		if canAccessWithCfg {
+			c.Next()
+
+			return
+		}
+
+		if groupPath == "" || len(excludePaths) == 0 {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		path := c.Request.URL.Path
+
+		for _, exclude := range excludePaths {
+			if exclude.FullPath {
+				if groupPath+exclude.ExcludePath == path {
+					c.Next()
+					return
+				}
+			} else {
+				if strings.HasPrefix(path, groupPath) && strings.HasSuffix(path, exclude.ExcludePath) {
+					c.Next()
+					return
+				}
+			}
+		}
+
+		c.AbortWithStatus(http.StatusForbidden)
+	}
+}
+
 // GetRedisConn GetRedisConn
+//func (c *Context) GetRedisConn() *redis.Conn {
+//	return c.NewRedisCache().GetRedisConn()
+//}
+
+func cfg2redisCfg(c *Context) redis.RdConfig {
+	dbCfg := c.cfg.DB
+	return redis.RdConfig{
+		Addresses:            dbCfg.RedisAddr,
+		Password:             dbCfg.RedisPass,
+		MinIdle:              dbCfg.RedisMaxIdle,
+		PoolSize:             dbCfg.RedisMaxOpen,
+		ConnMaxIdleTimeMills: 60 * 1000,
+		ReadTimeoutMills:     3 * 1000,
+		WriteTimeoutMills:    3 * 1000,
+		MaxWaitTimeoutMills:  5 * 1000,
+	}
+}
+
 func (c *Context) GetRedisConn() *redis.Conn {
-	return c.NewRedisCache().GetRedisConn()
+	return c.NewRedisCacheWithCfg(cfg2redisCfg(c)).GetRedisConn()
 }
 
 // EventBegin 开启事件
@@ -349,24 +398,71 @@ type StmtBuilder func(sess *dbr.Session) (*dbr.SelectStmt, *dbr.SelectStmt)
 
 func PageQry[T any](pp PageParam, stmt StmtBuilder) (*Pager[T], error) {
 	sess := myCtxPtr.Load().mySQLSession
-	count, result := stmt(sess)
+	cntStmt, condStmt := stmt(sess)
 
-	p := &Pager[T]{}
+	p := &Pager[T]{
+		Page: pp.Page,
+		Size: pp.Size,
+	}
 
-	err := count.LoadOne(&p.Total)
-	if err != nil {
+	if err := doPageQry(cntStmt, condStmt, p); err != nil {
 		return nil, err
 	}
 
-	_, err = result.
-		Offset(uint64((pp.Page - 1) * pp.Size)).
-		Limit(uint64(pp.Size)).
+	return p, nil
+}
+
+type PageGeneralParam struct {
+	PageParam
+
+	Table string
+}
+
+func NewPgp(page, size int, table string) PageGeneralParam {
+	return PageGeneralParam{
+		PageParam{
+			Page: page,
+			Size: size,
+		},
+		table,
+	}
+}
+
+type CondBuilder func(cntStmt, condStmt *dbr.SelectStmt)
+
+func PageGeneralQry[T any](pgp PageGeneralParam, cond CondBuilder) (*Pager[T], error) {
+	sess := myCtxPtr.Load().mySQLSession
+
+	cntStmt := sess.Select("COUNT(1)").From(pgp.Table)
+	condStmt := sess.Select("*").From(pgp.Table)
+
+	cond(cntStmt, condStmt)
+
+	p := &Pager[T]{
+		Page: pgp.Page,
+		Size: pgp.Size,
+	}
+
+	if err := doPageQry(cntStmt, condStmt, p); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+func doPageQry[T any](cntStmt, condStmt *dbr.SelectStmt, p *Pager[T]) error {
+	err := cntStmt.LoadOne(&p.Total)
+	if err != nil {
+		return err
+	}
+
+	_, err = condStmt.
+		Offset(uint64((p.Page - 1) * p.Size)).
+		Limit(uint64(p.Size)).
 		Load(&p.Items)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	p.Page = pp.Page
-	p.Size = pp.Size
-	return p, nil
+	return nil
 }

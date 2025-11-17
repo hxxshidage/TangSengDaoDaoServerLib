@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// Ten2Hex
+
 // Ten2Hex 十进制转换为62进制
 func Ten2Hex(ten int64) string {
 	hex := ""
